@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: rsk-backend
+    runtime: node
+    plan: starter            # persistent disks need a paid plan
+    buildCommand: npm install
+    startCommand: npm run start:render
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: RSK_DATA_DIR
+        value: /var/data
+      - key: RSK_CORS_ORIGINS
+        sync: false          # set in dashboard: your Vercel URL(s), comma separated
+      - key: RSK_OWNER_PASSWORD
+        sync: false          # set in dashboard: initial OWNER password
+    disk:
+      name: rsk-data
+      mountPath: /var/data
+      sizeGB: 1
