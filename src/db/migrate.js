@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getDb } from './connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
+export const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 export function runMigrations(db = getDb()) {
   db.exec(`

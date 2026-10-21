@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDashboard } from '../modules/reports/dashboard.service.js';
+import { getProfit } from '../modules/reports/profit.service.js';
 import { salesReport, purchasesReport, creditReport, pledgesReport } from '../modules/reports/reports.service.js';
 import { getDb } from '../db/connection.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
@@ -24,7 +25,11 @@ reportsRouter.get('/pledges', requireAuth, requirePermission('reports.view'), as
 }));
 
 reportsRouter.get('/dashboard', requireAuth, requirePermission('reports.view'), asyncRoute((req, res) => {
-  res.json(getDashboard({ startDate: req.query.startDate, endDate: req.query.endDate }));
+  res.json(getDashboard({ startDate: req.query.startDate, endDate: req.query.endDate, includeProfit: req.permissions.has('profit.view') }));
+}));
+
+reportsRouter.get('/profit', requireAuth, requirePermission('profit.view'), asyncRoute((req, res) => {
+  res.json(getProfit({ startDate: req.query.startDate, endDate: req.query.endDate }));
 }));
 
 reportsRouter.get('/stock-on-hand', requireAuth, requirePermission('reports.view'), asyncRoute((req, res) => {

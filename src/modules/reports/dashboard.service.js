@@ -1,6 +1,7 @@
 import { getDb } from '../../db/connection.js';
 import { fromMinorUnits } from '../../lib/money.js';
 import { getSaleOutstandingMinor } from '../sales/sale.service.js';
+import { getProfit } from './profit.service.js';
 
 /**
  * Every figure here comes from a backend query over real tables — nothing is
@@ -8,7 +9,7 @@ import { getSaleOutstandingMinor } from '../sales/sale.service.js';
  * collections (cash actually received) are kept as three distinct metrics,
  * never conflated.
  */
-export function getDashboard({ startDate, endDate } = {}) {
+export function getDashboard({ startDate, endDate, includeProfit = false } = {}) {
   const db = getDb();
   const range = dateRangeClause(startDate, endDate);
 
@@ -70,6 +71,7 @@ export function getDashboard({ startDate, endDate } = {}) {
     pendingApprovals,
     pledgeExposure: fromMinorUnits(pledgeExposureMinor),
     completedSaleCount: openSales.length,
+    profit: includeProfit ? getProfit({ startDate, endDate }) : null,
     recentActivity: recentAudit.map((a) => ({ action: a.action, entityType: a.entity_type, entityId: a.entity_id, at: a.created_at })),
   };
 }

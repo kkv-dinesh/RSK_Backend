@@ -72,3 +72,25 @@ export function priceSaleLine({ netWeightMg, ratePerGramMinor, wastageChargeMino
   const lineTotalMinor = metalValueMinor + makingChargeMinor + wastage + stoneCharge;
   return { metalValueMinor, makingChargeMinor, wastageChargeMinor: wastage, stoneChargeMinor: stoneCharge, lineTotalMinor };
 }
+
+/**
+ * "Settle in full" billing: when the customer pays less than the final amount
+ * and the shopkeeper chooses to settle the bill, the shortfall is added to the
+ * discount so the balance becomes zero. Example: subtotal 36,000, discount
+ * 1,000, received 33,000 -> final amount 35,000, extra discount 2,000 ->
+ * discount 3,000, final amount 33,000, balance 0.
+ */
+export function settleShortfallAsDiscount({ subtotalMinor, discountMinor, taxMinor, receivedMinor }) {
+  if (!Number.isInteger(receivedMinor) || receivedMinor <= 0) {
+    throw new ValidationError('Enter the amount received to settle the bill in full.');
+  }
+  const { totalMinor } = calculateFinalAmount({
+    metalValueMinor: subtotalMinor, makingChargeMinor: 0, wastageChargeMinor: 0, stoneChargeMinor: 0, discountMinor, taxMinor,
+  });
+  const shortfall = totalMinor - receivedMinor;
+  if (shortfall <= 0) return { discountMinor, autoDiscountMinor: 0, totalMinor };
+  if (discountMinor + shortfall > subtotalMinor) {
+    throw new ValidationError('The amount received is too low: the total discount cannot exceed the subtotal.');
+  }
+  return { discountMinor: discountMinor + shortfall, autoDiscountMinor: shortfall, totalMinor: receivedMinor };
+}

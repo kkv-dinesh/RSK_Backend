@@ -20,12 +20,18 @@ salesRouter.get('/:id/invoice', requireAuth, asyncRoute((req, res) => {
   res.json(getSale(req.params.id));
 }));
 
+// Adding a shortfall to the discount is a discount, so it needs discount.apply too.
+const needsDiscountPermission = (req) => req.body?.discount > 0 || req.body?.settleShortfall === true;
+
 salesRouter.post('/preview', requireAuth, requirePermission('sale.create'), asyncRoute((req, res) => {
+  if (req.body?.settleShortfall === true && !req.permissions.has('discount.apply')) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Missing permission: discount.apply' });
+  }
   res.json(previewSale(req.body ?? {}));
 }));
 
 salesRouter.post('/', requireAuth, requirePermission('sale.create'), asyncRoute((req, res) => {
-  if (req.body?.discount > 0 && !req.permissions.has('discount.apply')) {
+  if (needsDiscountPermission(req) && !req.permissions.has('discount.apply')) {
     return res.status(403).json({ error: 'FORBIDDEN', message: 'Missing permission: discount.apply' });
   }
   const sale = createSale({ ...req.body, createdBy: req.user.id });

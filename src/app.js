@@ -15,6 +15,7 @@ import { pledgesRouter } from './routes/pledges.routes.js';
 import { approvalsRouter } from './routes/approvals.routes.js';
 import { reportsRouter } from './routes/reports.routes.js';
 import { usersRouter } from './routes/users.routes.js';
+import { backupRouter } from './routes/backup.routes.js';
 import { errorToResponse } from './lib/errors.js';
 
 export function createApp() {
@@ -29,6 +30,7 @@ export function createApp() {
     if (origin && allowedOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     }
     if (req.method === 'OPTIONS') return res.status(204).end();
@@ -53,6 +55,7 @@ export function createApp() {
   app.use('/api/v1/approvals', approvalsRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/users', usersRouter);
+  app.use('/api/v1/backup', backupRouter);
 
   app.use((req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
 

@@ -24,7 +24,7 @@ const PERMISSIONS = [
   'credit.settle',
   'pledge.create', 'pledge.modify', 'pledge.settle',
   'approval.decide',
-  'reports.view',
+  'reports.view', 'profit.view', 'backup.manage',
   'audit.view',
   'users.manage',
 ];
@@ -37,12 +37,12 @@ const SENSITIVE_PERMISSIONS = [
   'rate.change', 'stock.adjust',
   'sale.cancel', 'purchase.cancel', 'order.cancel',
   'payment.reverse', 'discount.approve', 'pledge.settle', 'credit.settle',
-  'approval.decide', 'users.manage',
+  'approval.decide', 'users.manage', 'profit.view', 'backup.manage',
 ];
 
 const ROLE_PERMISSIONS = {
   OWNER: PERMISSIONS,
-  ADMINISTRATOR: PERMISSIONS.filter((p) => p !== 'users.manage'),
+  ADMINISTRATOR: PERMISSIONS.filter((p) => p !== 'users.manage' && p !== 'backup.manage'),
   SENIOR_STAFF: PERMISSIONS.filter((p) => !SENSITIVE_PERMISSIONS.includes(p)),
   STAFF: ['sale.create', 'purchase.create', 'order.create', 'payment.create', 'pledge.create', 'pledge.modify', 'reports.view'],
 };
@@ -58,11 +58,8 @@ const DEV_USERS = IS_PROD
       { username: 'staff', displayName: 'Staff User (Demo)', password: 'staff-dev-only', role: 'STAFF' },
     ];
 
-export function seed(db = getDb()) {
-  if (IS_PROD && !process.env.RSK_OWNER_PASSWORD) {
-    throw new Error('RSK_OWNER_PASSWORD must be set when seeding in production.');
-  }
-  runMigrations(db);
+/** Makes sure every role and permission this version knows about exists (safe to repeat; used after a restore too). */
+export function syncAccessControl(db = getDb()) {
 
   const insertRole = db.prepare('INSERT OR IGNORE INTO roles (name, description) VALUES (?, ?)');
   for (const r of ROLES) insertRole.run(r.name, r.description);
@@ -78,6 +75,15 @@ export function seed(db = getDb()) {
     const roleId = roleIdByName.get(role);
     for (const code of perms) insertRolePerm.run(roleId, permIdByCode.get(code));
   }
+}
+
+export function seed(db = getDb()) {
+  if (IS_PROD && !process.env.RSK_OWNER_PASSWORD) {
+    throw new Error('RSK_OWNER_PASSWORD must be set when seeding in production.');
+  }
+  runMigrations(db);
+  syncAccessControl(db);
+  const roleIdByName = new Map(db.prepare('SELECT id, name FROM roles').all().map((r) => [r.name, r.id]));
 
   const insertUser = db.prepare(
     'INSERT OR IGNORE INTO users (username, display_name, password_hash) VALUES (?, ?, ?)'

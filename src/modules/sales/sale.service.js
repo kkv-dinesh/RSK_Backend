@@ -1,7 +1,7 @@
 import { getDb } from '../../db/connection.js';
 import { ValidationError, ConflictError, NotFoundError } from '../../lib/errors.js';
 import { fromMinorUnits } from '../../lib/money.js';
-import { priceSaleLine, calculateDiscount, calculateTax, calculateFinalAmount, makingChargeRateForWeight } from './pricing.service.js';
+import { priceSaleLine, calculateDiscount, calculateTax, calculateFinalAmount, makingChargeRateForWeight, settleShortfallAsDiscount } from './pricing.service.js';
 import { recordMovement } from '../stock/stock.service.js';
 import { appendLedgerEntry } from '../customers/customer.service.js';
 import { recordAudit } from '../audit/audit.service.js';
@@ -13,7 +13,7 @@ import { normalizePaymentMethod, DEFAULT_PAYMENT_METHOD } from '../../lib/paymen
  * ledger, the customer ledger, and (optionally) an initial payment —
  * all inside one transaction (spec §4.4, §6.2).
  */
-export function createSale({ customerId, items, discount = 0, tax = 0, payment, createdBy }) {
+export function createSale({ customerId, items, discount = 0, tax = 0, payment, settleShortfall = false, createdBy }) {
   if (!customerId) throw new ValidationError('customerId is required.');
   if (!Array.isArray(items) || items.length === 0) throw new ValidationError('At least one item line is required.');
 
@@ -80,14 +80,20 @@ export function createSale({ customerId, items, discount = 0, tax = 0, payment, 
       lineRows.push({ tagId: item.tag_id, ...priced });
     }
 
-    const discountMinor = calculateDiscount(subtotalMinor, Math.round(discount * 100));
+    let discountMinor = calculateDiscount(subtotalMinor, Math.round(discount * 100));
     const taxMinor = calculateTax(Math.round(tax * 100));
-    const { totalMinor } = calculateFinalAmount({
+    let { totalMinor } = calculateFinalAmount({
       metalValueMinor: subtotalMinor, makingChargeMinor: 0, wastageChargeMinor: 0, stoneChargeMinor: 0, discountMinor, taxMinor,
     });
+    let autoDiscountMinor = 0;
+    if (settleShortfall) {
+      ({ discountMinor, autoDiscountMinor, totalMinor } = settleShortfallAsDiscount({
+        subtotalMinor, discountMinor, taxMinor, receivedMinor: Math.round((payment?.amount ?? 0) * 100),
+      }));
+    }
 
-    db.prepare('UPDATE sales SET subtotal_minor = ?, discount_minor = ?, tax_minor = ?, total_minor = ? WHERE id = ?')
-      .run(subtotalMinor, discountMinor, taxMinor, totalMinor, saleId);
+    db.prepare('UPDATE sales SET subtotal_minor = ?, discount_minor = ?, auto_discount_minor = ?, tax_minor = ?, total_minor = ? WHERE id = ?')
+      .run(subtotalMinor, discountMinor, autoDiscountMinor, taxMinor, totalMinor, saleId);
 
     appendLedgerEntry(db, {
       customerId, entryType: 'INVOICE', amountMinor: totalMinor, sourceTransaction: `SALE-${saleId}`, createdBy,
@@ -98,7 +104,7 @@ export function createSale({ customerId, items, discount = 0, tax = 0, payment, 
       action: 'SALE_CREATE',
       entityType: 'sale',
       entityId: saleId,
-      newState: { customerId, totalMinor, itemCount: lineRows.length },
+      newState: { customerId, totalMinor, discountMinor, autoDiscountMinor, itemCount: lineRows.length },
       sourceTransaction: `SALE-${saleId}`,
     });
 
@@ -124,7 +130,7 @@ export function createSale({ customerId, items, discount = 0, tax = 0, payment, 
  * Prices a prospective sale exactly as createSale would, without writing
  * anything. The UI shows this so staff review the real figures before confirming.
  */
-export function previewSale({ items, discount = 0, tax = 0 }) {
+export function previewSale({ items, discount = 0, tax = 0, payAmount = 0, settleShortfall = false }) {
   if (!Array.isArray(items) || items.length === 0) throw new ValidationError('Add at least one item.');
   const db = getDb();
   const seen = new Set();
@@ -151,13 +157,20 @@ export function previewSale({ items, discount = 0, tax = 0 }) {
       lineTotal: fromMinorUnits(priced.lineTotalMinor),
     };
   });
-  const discountMinor = calculateDiscount(subtotalMinor, Math.round(discount * 100));
+  let discountMinor = calculateDiscount(subtotalMinor, Math.round(discount * 100));
   const taxMinor = calculateTax(Math.round(tax * 100));
-  const { totalMinor } = calculateFinalAmount({
+  let { totalMinor } = calculateFinalAmount({
     metalValueMinor: subtotalMinor, makingChargeMinor: 0, wastageChargeMinor: 0, stoneChargeMinor: 0, discountMinor, taxMinor,
   });
+  const enteredDiscountMinor = discountMinor;
+  const receivedMinor = Math.round(payAmount * 100);
+  let autoDiscountMinor = 0;
+  if (settleShortfall && receivedMinor > 0) {
+    ({ discountMinor, autoDiscountMinor, totalMinor } = settleShortfallAsDiscount({ subtotalMinor, discountMinor, taxMinor, receivedMinor }));
+  }
   return {
     lines, subtotal: fromMinorUnits(subtotalMinor), discount: fromMinorUnits(discountMinor),
+    enteredDiscount: fromMinorUnits(enteredDiscountMinor), autoDiscount: fromMinorUnits(autoDiscountMinor),
     tax: fromMinorUnits(taxMinor), total: fromMinorUnits(totalMinor),
   };
 }
@@ -240,6 +253,7 @@ export function getSale(id) {
     status: sale.status,
     subtotal: fromMinorUnits(sale.subtotal_minor),
     discount: fromMinorUnits(sale.discount_minor),
+    autoDiscount: fromMinorUnits(sale.auto_discount_minor),
     tax: fromMinorUnits(sale.tax_minor),
     total: fromMinorUnits(sale.total_minor),
     outstanding: fromMinorUnits(outstandingMinor),
