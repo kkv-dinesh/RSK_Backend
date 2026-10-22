@@ -12,6 +12,7 @@ import { paymentsRouter } from './routes/payments.routes.js';
 import { creditRouter } from './routes/credit.routes.js';
 import { ordersRouter } from './routes/orders.routes.js';
 import { pledgesRouter } from './routes/pledges.routes.js';
+import { chitsRouter } from './routes/chits.routes.js';
 import { approvalsRouter } from './routes/approvals.routes.js';
 import { reportsRouter } from './routes/reports.routes.js';
 import { usersRouter } from './routes/users.routes.js';
@@ -52,6 +53,7 @@ export function createApp() {
   app.use('/api/v1/credit', creditRouter);
   app.use('/api/v1/orders', ordersRouter);
   app.use('/api/v1/pledges', pledgesRouter);
+  app.use('/api/v1/chits', chitsRouter);
   app.use('/api/v1/approvals', approvalsRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/users', usersRouter);

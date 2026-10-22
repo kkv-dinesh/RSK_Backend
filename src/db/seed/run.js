@@ -23,6 +23,7 @@ const PERMISSIONS = [
   'payment.create', 'payment.reverse',
   'credit.settle',
   'pledge.create', 'pledge.modify', 'pledge.settle',
+  'chit.create', 'chit.pay', 'chit.redeem', 'chit.cancel',
   'approval.decide',
   'reports.view', 'profit.view', 'backup.manage',
   'audit.view',
@@ -36,7 +37,7 @@ const PERMISSIONS = [
 const SENSITIVE_PERMISSIONS = [
   'rate.change', 'stock.adjust',
   'sale.cancel', 'purchase.cancel', 'order.cancel',
-  'payment.reverse', 'discount.approve', 'pledge.settle', 'credit.settle',
+  'payment.reverse', 'discount.approve', 'pledge.settle', 'credit.settle', 'chit.cancel',
   'approval.decide', 'users.manage', 'profit.view', 'backup.manage',
 ];
 
@@ -44,7 +45,7 @@ const ROLE_PERMISSIONS = {
   OWNER: PERMISSIONS,
   ADMINISTRATOR: PERMISSIONS.filter((p) => p !== 'users.manage' && p !== 'backup.manage'),
   SENIOR_STAFF: PERMISSIONS.filter((p) => !SENSITIVE_PERMISSIONS.includes(p)),
-  STAFF: ['sale.create', 'purchase.create', 'order.create', 'payment.create', 'pledge.create', 'pledge.modify', 'reports.view'],
+  STAFF: ['sale.create', 'purchase.create', 'order.create', 'payment.create', 'pledge.create', 'pledge.modify', 'chit.create', 'chit.pay', 'chit.redeem', 'reports.view'],
 };
 
 // DEMO ONLY credentials for local development. Never reuse in production.
